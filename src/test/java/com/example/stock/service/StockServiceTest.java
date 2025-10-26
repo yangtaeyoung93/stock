@@ -8,6 +8,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
+import java.util.concurrent.*;
+
 import static org.assertj.core.api.Assertions.*;
 @SpringBootTest
 class StockServiceTest {
@@ -38,4 +40,28 @@ class StockServiceTest {
         //then
         assertThat(stock.getQuantity()).isEqualTo(99L);
     }
+
+    @Test
+    public void 동시에_100개요청() throws InterruptedException {
+        int threadCnt = 100;
+        ExecutorService executorService = Executors.newFixedThreadPool(32);
+        CountDownLatch latch = new CountDownLatch(threadCnt);
+
+        for (int i = 0; i < threadCnt; i++) {
+            executorService.submit(() -> {
+                try {
+                    stockService.decrease(1L, 1L);
+                }finally {
+                    latch.countDown();
+                }
+            });
+        }
+        latch.await();
+
+        Stock stock = stockRepository.findById(1L).orElseThrow();
+        //100 - (1 * 100) = 0
+
+        assertThat(stock.getQuantity()).isEqualTo(0);
+    }
+
 }
